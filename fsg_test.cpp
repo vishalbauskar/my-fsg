@@ -1,4 +1,4 @@
-#include "fsg_candidate.hpp"
+
 #include "fsg.hpp"
 
 #include <boost/graph/adjacency_list.hpp>

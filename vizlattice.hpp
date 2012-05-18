@@ -11,7 +11,6 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
-#include "lattice.hpp"
 
 template<class G>
 class LatGraph
