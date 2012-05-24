@@ -12,67 +12,61 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graphviz.hpp>
 
-template<class G>
-class LatGraph
+#include "fsg.hpp"
+
+
+template<class G, class L>
+class VizFSGLattice : public graph_alg::FSG_Lattice<G,L>
 {
+    typedef graph_alg::FSG_Lattice<G,L> Base;
 public:
+    template<class GI>
+    VizFSGLattice(GI gi_begin, GI gi_end, const L& l = L());
+    void grviz_write() const;
+private:
+    
+    typedef graph_alg::detail::Candidate<G,L> CandidateGraph;
+
     typedef boost::adjacency_list<boost::vecS,
 				  boost::vecS,
 				  boost::directedS,
-				  std::pair<const G*, std::string> > LG;
+				  std::pair<const CandidateGraph*, std::string> > LG;
     typedef typename boost::graph_traits<LG>::vertex_descriptor V;
     typedef typename boost::graph_traits<LG>::vertex_iterator VI;
 
     LG lat_graph;
-    std::map<const G*, V> g2v;
-
-    LatGraph(const graph_alg::Lattice<G>& l);
-    
-    void write_gviz() const;
+    std::map<const CandidateGraph*, V> g2v;
 };
 
 
-template<class G>
-LatGraph<G>::LatGraph(const graph_alg::Lattice<G>& l)
+template<class G, class L>
+template<class GI>
+VizFSGLattice<G,L>::VizFSGLattice(GI gi_begin, GI gi_end, const L& l)
+    : Base(gi_begin, gi_end, l)
 {
     // create vertices
-    typedef typename graph_alg::Lattice<G>::const_iterator LI;
-    typedef typename graph_alg::GraphCollection<G> GColl;
-    typedef typename GColl::const_iterator GI;
-    for (LI li = l.begin(); li != l.end(); ++li)
-	for (GI gi = li->begin(); gi != li->end(); ++gi)
+    for (typename Base::CC_CI i = Base::lattice.begin(); i != Base::lattice.end(); ++i)
+	for (typename Base::CG_CI j = i->begin(); j != i->end(); ++j)
 	{
 	    std::ostringstream file_name;
-	    file_name << "g" << (*gi)->ID;
+	    file_name << "g" << j->id;
 
 	    V v = add_vertex(lat_graph);
-	    g2v[*gi] = v;
-	    lat_graph[v] = std::make_pair(*gi, file_name.str());
+	    g2v[&*j] = v;
+	    lat_graph[v] = std::make_pair(&*j, file_name.str());
 	}
-    
+
     // create edges
-    typedef typename graph_alg::LatticeLayer<G>::const_iterator LLI;
-    for (LLI lli = l.ll.begin(); lli != l.ll.end(); ++lli)
+    typename std::map<const CandidateGraph*, V>::const_iterator k;
+    for (k = g2v.begin(); k != g2v.end(); ++k)
     {
-	const G* g_descen = lli->first;
-	const G* g_ascen  = lli->second.ancestor;
-	typename std::map<const G*, V>::const_iterator g2v_i;
-
-	g2v_i = g2v.find(g_descen);
-	assert(g2v_i != g2v.end());
-	V v_descen = g2v_i->second;
-	
-	g2v_i = g2v.find(g_ascen);
-	assert(g2v_i != g2v.end());	
-	V v_ascen = g2v_i->second;
-	
-	bool edge_added = add_edge(v_descen, v_ascen, lat_graph).second;
-	assert(edge_added);
-
-	v_descen=v_descen;
-	v_ascen=v_ascen;
+	typename CandidateGraph::P_CI h;
+	for (h = k->first->parents.begin(); h != k->first->parents.end(); ++h)
+	    add_edge(k->second, g2v[h->parent], lat_graph);
     }
 }
+
+
 
 template <class Name>
 class my_label_writer {
@@ -94,27 +88,30 @@ public:
     template <class VertexOrEdge>
     void operator()(std::ostream& out, const VertexOrEdge& v) const {
 	out << "[image=\"" << name[v].second + ".png" << "\"]";
-	out << "[label=" << name[v].first->ID << "]";
+	out << "[label=" << name[v].first->id << "]";
     }
 private:
     Name name;
 };
 
-template<class G>
-void LatGraph<G>::write_gviz() const
+
+template<class G, class L>
+void VizFSGLattice<G,L>::grviz_write() const
 {
+    ::system("rm -f grviz/*");
+
     for (std::pair<VI,VI> vip = vertices(lat_graph); vip.first != vip.second;
 	 ++vip.first)
     {
-	const std::pair<const G*, std::string>& pp = lat_graph[*vip.first];
+	const std::pair<const CandidateGraph*, std::string>& pp = lat_graph[*vip.first];
 	
-	const G& g = *pp.first;
+	const CandidateGraph& g = *pp.first;
 	std::filebuf dot;
 	std::string dot_file = "grviz/" + pp.second;
 	std::filebuf* p = dot.open((dot_file + ".dot").c_str(), std::ios::out);
 	assert(p);
 	std::ostream os(&dot);
-	write_graphviz(os, g, my_label_writer<G>(g));
+	write_graphviz(os, g, my_label_writer<CandidateGraph>(g));
 
 	dot.close();
 
@@ -130,15 +127,7 @@ void LatGraph<G>::write_gviz() const
     dot.close();
 
     ::system("cd grviz && dot -Tpng graph.dot > graph.png");
-}
 
-
-template<class G>
-void pr_lattice(const graph_alg::Lattice<G>& l)
-{
-    ::system("rm -f /home/dedal/programming/vf2/grviz/*");
-    LatGraph<G> latg(l);
-    latg.write_gviz();
 }
 
 #endif
