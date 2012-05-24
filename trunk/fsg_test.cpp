@@ -1,6 +1,4 @@
 
-#include "fsg.hpp"
-
 #include <boost/graph/adjacency_list.hpp>
 
 #include <iostream>
@@ -35,9 +33,8 @@ struct LabelOps {
     label_iterator end() const		{ return labels+3; }
 };
 
-typedef Candidate<Graph, LabelOps> Cand;
-typedef Cand::MV MV;
 
+typedef VizFSGLattice<Graph, LabelOps> FSGLattice;
 
 void mk_g_1(Graph& g)
 {
@@ -82,7 +79,9 @@ int main()
     mk_g_1(g[0]);
     mk_g_2(g[1]);
 
-    Lattice<Cand> lattice;
-    fsg(lattice, g, g+1/*NR_GRAPHS*/, LabelOps());
-    pr_lattice(lattice);
+    FSGLattice lattice(g, g+1);
+    lattice.grviz_write();
+
+    cout << "Num graphs = " << lattice.get_num_graphs() << endl;
+    cout << "Num all graphs = " << lattice.get_num_all_created_graphs() << endl;
 }
